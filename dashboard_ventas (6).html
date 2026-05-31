@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seguimiento Ventas — DHS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0e1a;--surface:#111827;--surface2:#1a2235;--border:#1f2d45;
+  --c1:#00d4ff;--c2:#ff6b35;--c3:#7c3aed;--c4:#10b981;--c5:#f59e0b;
+  --text:#e2e8f0;--muted:#64748b;--dim:#94a3b8;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{font-size:15px;scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(0,212,255,.06) 0%,transparent 50%),
+  radial-gradient(ellipse at 80% 100%,rgba(124,58,237,.06) 0%,transparent 50%);}
+
+/* HEADER */
+.header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;
+  border-bottom:1px solid var(--border);background:rgba(17,24,39,.92);backdrop-filter:blur(12px);
+  position:sticky;top:0;z-index:100;}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-mark{width:36px;height:36px;background:linear-gradient(135deg,var(--c1),var(--c3));
+  border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+.logo-name{font-family:'Syne',sans-serif;font-weight:800;font-size:1.05rem;letter-spacing:-.5px;}
+.logo-sub{font-size:.58rem;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
+.hdr-right{display:flex;align-items:center;gap:14px;}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--muted);}
+.pulse.on{background:var(--c4);box-shadow:0 0 8px var(--c4);animation:blink 2s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(1.3);}}
+.hdr-status{font-size:.65rem;color:var(--muted);}
+.hdr-time{font-size:.65rem;color:var(--c1);}
+
+/* UPLOAD */
+.upload-bar{padding:10px 28px;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.upload-lbl{font-size:.62rem;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap;}
+.upload-btn{display:flex;align-items:center;gap:7px;padding:6px 14px;border:1px solid var(--c1);
+  border-radius:6px;background:rgba(0,212,255,.07);color:var(--c1);font-family:'DM Mono',monospace;
+  font-size:.72rem;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.upload-btn:hover{background:rgba(0,212,255,.18);box-shadow:0 0 16px rgba(0,212,255,.2);}
+#file-input{display:none;}
+.file-lbl{font-size:.7rem;color:var(--c4);}
+.ext-tag{display:inline-block;background:var(--bg);border:1px solid var(--border);
+  padding:1px 5px;border-radius:3px;font-size:.6rem;margin:0 2px;color:var(--muted);}
+#loading{display:none;align-items:center;gap:8px;margin-left:auto;}
+.spin{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--c1);
+  border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* FILTERS */
+.filters{padding:10px 28px;display:none;gap:10px;flex-wrap:wrap;align-items:center;
+  border-bottom:1px solid var(--border);background:rgba(17,24,39,.5);}
+.flbl{font-size:.58rem;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;}
+select.fsel{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  font-family:'DM Mono',monospace;font-size:.7rem;padding:5px 8px;border-radius:5px;
+  cursor:pointer;outline:none;transition:border-color .2s;}
+select.fsel:focus{border-color:var(--c1);}
+.fdiv{width:1px;height:18px;background:var(--border);}
+.btn-rst{padding:5px 10px;background:transparent;border:1px solid var(--border);border-radius:5px;
+  color:var(--muted);font-family:'DM Mono',monospace;font-size:.65rem;cursor:pointer;transition:all .2s;}
+.btn-rst:hover{border-color:var(--c2);color:var(--c2);}
+
+/* MAIN */
+.main{padding:18px 28px 48px;}
+
+/* EMPTY */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:60vh;gap:14px;text-align:center;}
+.empty-ico{font-size:3rem;opacity:.35;}
+.empty-title{font-family:'Syne',sans-serif;font-weight:700;font-size:1.2rem;color:var(--dim);}
+.empty-desc{font-size:.73rem;color:var(--muted);max-width:340px;line-height:1.8;}
+.empty-cta{margin-top:6px;padding:11px 26px;background:linear-gradient(135deg,var(--c1),var(--c3));
+  border:none;border-radius:8px;color:#fff;font-family:'DM Mono',monospace;
+  font-size:.8rem;cursor:pointer;transition:opacity .2s;}
+.empty-cta:hover{opacity:.85;}
+
+/* ── KPI ROW 1: 5 cards ── */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px;}
+@media(max-width:1100px){.kpi-row{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:700px){.kpi-row{grid-template-columns:1fr 1fr;}}
+
+.kcard{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:14px 18px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;}
+.kcard:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.3);}
+.kcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.kcard.c1::before{background:linear-gradient(90deg,var(--c1),transparent);}
+.kcard.c2::before{background:linear-gradient(90deg,var(--c2),transparent);}
+.kcard.c4::before{background:linear-gradient(90deg,var(--c4),transparent);}
+.kcard.c3::before{background:linear-gradient(90deg,var(--c3),transparent);}
+.kcard.c5::before{background:linear-gradient(90deg,var(--c5),transparent);}
+.kcard.cx::before{background:linear-gradient(90deg,#e879f9,transparent);}
+.kt{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.klbl{font-size:.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.kico{font-size:1rem;opacity:.65;}
+.kval{font-family:'Syne',sans-serif;font-weight:800;font-size:1.55rem;line-height:1;
+  margin-bottom:5px;letter-spacing:-.5px;}
+.kcard.c1 .kval{color:var(--c1);}
+.kcard.c2 .kval{color:var(--c2);}
+.kcard.c4 .kval{color:var(--c4);}
+.kcard.c3 .kval{color:var(--c3);}
+.kcard.c5 .kval{color:var(--c5);}
+.kcard.cx .kval{color:#e879f9;}
+.ksub{font-size:.6rem;color:var(--muted);}
+
+/* ── KPI ROW 2: avance + frecuencia + accesorios ── */
+.kpi-row2{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:16px;}
+@media(max-width:900px){.kpi-row2{grid-template-columns:1fr 1fr;}}
+
+/* AVANCE CARD */
+.avance-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:14px 20px;position:relative;overflow:hidden;}
+.avance-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--c4),var(--c5),var(--c2));}
+.avance-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.avance-title{font-size:.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.avance-val{font-family:'Syne',sans-serif;font-weight:800;font-size:1.55rem;color:var(--c4);letter-spacing:-.5px;}
+.avance-meta{font-size:.62rem;color:var(--muted);margin-bottom:10px;}
+.progress-track{height:8px;background:var(--surface2);border-radius:99px;overflow:hidden;border:1px solid var(--border);}
+.progress-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--c4),var(--c5));
+  transition:width .8s cubic-bezier(.4,0,.2,1);}
+.progress-labels{display:flex;justify-content:space-between;margin-top:5px;}
+.progress-lbl{font-size:.58rem;color:var(--muted);}
+
+/* LAYOUT ROWS */
+.row31{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+@media(max-width:860px){.row31,.row2{grid-template-columns:1fr;}}
+
+/* CHART / TABLE CARDS */
+.ccard{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:16px 20px;transition:box-shadow .2s;}
+.ccard:hover{box-shadow:0 4px 20px rgba(0,0,0,.22);}
+.ch{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+.ctitle{font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem;}
+.csub{font-size:.58rem;color:var(--muted);margin-top:2px;letter-spacing:1px;}
+.ctag{font-size:.55rem;background:var(--surface2);border:1px solid var(--border);
+  color:var(--muted);padding:2px 7px;border-radius:4px;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;}
+.cwrap canvas{max-height:290px;}
+.cwrap.sm canvas{max-height:230px;}
+.cwrap.lg canvas{max-height:350px;}
+
+/* VENDOR TABLE */
+.vtable{width:100%;border-collapse:collapse;font-size:.7rem;}
+.vtable th{color:var(--muted);font-size:.56rem;letter-spacing:1.2px;text-transform:uppercase;
+  padding:5px 8px;text-align:left;border-bottom:1px solid var(--border);}
+.vtable td{padding:6px 8px;border-bottom:1px solid rgba(31,45,69,.5);}
+.vtable tr:last-child td{border-bottom:none;font-weight:600;}
+.vtable tr:hover td{background:rgba(255,255,255,.025);}
+.num{text-align:right;font-variant-numeric:tabular-nums;}
+.bar-cell{position:relative;min-width:90px;}
+.bar-bg{position:absolute;left:0;top:0;bottom:0;background:rgba(0,212,255,.1);border-radius:3px;transition:width .6s;}
+.bar-txt{position:relative;z-index:1;}
+
+/* DTO TABLE */
+.dtable{width:100%;border-collapse:collapse;font-size:.7rem;}
+.dtable th{color:var(--muted);font-size:.56rem;letter-spacing:1.2px;text-transform:uppercase;
+  padding:5px 8px;text-align:left;border-bottom:1px solid var(--border);}
+.dtable td{padding:6px 8px;border-bottom:1px solid rgba(31,45,69,.4);}
+.dtable tr:hover td{background:rgba(255,255,255,.02);}
+.pct-pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:.62rem;font-weight:600;}
+.pct-hi{background:rgba(239,68,68,.15);color:#ef4444;}
+.pct-mid{background:rgba(245,158,11,.15);color:#f59e0b;}
+.pct-lo{background:rgba(16,185,129,.15);color:#10b981;}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-mark">🎨</div>
+    <div>
+      <div class="logo-name">SEGUIMIENTO VENTAS — DHS</div>
+      <div class="logo-sub">DHS · Distribuidora Oficial ALBA</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="pulse" id="pulse"></div>
+    <div>
+      <div class="hdr-status" id="hdr-status">Sin datos cargados</div>
+      <div class="hdr-time" id="hdr-time"></div>
+    </div>
+  </div>
+</header>
+
+<div class="upload-bar">
+  <span class="upload-lbl">📂 Fuente</span>
+  <button class="upload-btn" onclick="document.getElementById('file-input').click()">⬆ Cargar / Actualizar Excel</button>
+  <input type="file" id="file-input" accept=".xlsx,.xls,.csv" onchange="handleFile(this)">
+  <span class="file-lbl" id="file-lbl">Ningún archivo</span>
+  <span style="font-size:.62rem;color:var(--muted);">
+    Soporta<span class="ext-tag">.xlsx</span><span class="ext-tag">.xls</span><span class="ext-tag">.csv</span>
+    · Hoja: <span class="ext-tag">BASE</span>
+  </span>
+  <div id="loading"><div class="spin"></div><span style="font-size:.68rem;color:var(--muted)">Procesando…</span></div>
+</div>
+
+<div class="filters" id="filters">
+  <span class="flbl">Filtros</span>
+  <select class="fsel" id="f-mes" onchange="applyFilters()"><option value="">Todos los meses</option></select>
+  <select class="fsel" id="f-tipo" onchange="applyFilters()"><option value="">Todos los tipos</option></select>
+  <select class="fsel" id="f-vendedor" onchange="applyFilters()"><option value="">Todos los vendedores</option></select>
+  <select class="fsel" id="f-segmento" onchange="applyFilters()"><option value="">Todos los segmentos</option></select>
+  <div class="fdiv"></div>
+  <button class="btn-rst" onclick="resetFilters()">✕ Limpiar</button>
+</div>
+
+<main class="main">
+  <div class="empty" id="empty-state">
+    <div class="empty-ico">📁</div>
+    <div class="empty-title">Cargá tu archivo de ventas</div>
+    <div class="empty-desc">Subí el Excel con la hoja <strong style="color:var(--c1)">BASE</strong> para ver el seguimiento completo. Podés actualizarlo cuando quieras.</div>
+    <button class="empty-cta" onclick="document.getElementById('file-input').click()">⬆ Seleccionar archivo</button>
+  </div>
+
+  <div id="dash" style="display:none;">
+
+    <!-- ── ROW 1: 5 KPI cards principales ── -->
+    <div class="kpi-row">
+      <div class="kcard c1">
+        <div class="kt"><span class="klbl">Ventas Totales</span><span class="kico">💰</span></div>
+        <div class="kval" id="k-ventas">—</div>
+        <div class="ksub" id="k-ventas-sub">—</div>
+      </div>
+      <div class="kcard c2">
+        <div class="kt"><span class="klbl">Litros Vendidos</span><span class="kico">🔵</span></div>
+        <div class="kval" id="k-litros">—</div>
+        <div class="ksub" id="k-litros-sub">—</div>
+      </div>
+      <div class="kcard c4">
+        <div class="kt"><span class="klbl">Clientes Compradores</span><span class="kico">👥</span></div>
+        <div class="kval" id="k-clientes">—</div>
+        <div class="ksub" id="k-clientes-sub">—</div>
+      </div>
+      <div class="kcard c5">
+        <div class="kt"><span class="klbl">Precio Neto × Litro</span><span class="kico">📐</span></div>
+        <div class="kval" id="k-ticket">—</div>
+        <div class="ksub" id="k-ticket-sub">Facturación / Litros</div>
+      </div>
+      <div class="kcard c3">
+        <div class="kt"><span class="klbl">Dto. Promedio</span><span class="kico">🏷</span></div>
+        <div class="kval" id="k-dto">—</div>
+        <div class="ksub" id="k-dto-sub">—</div>
+      </div>
+    </div>
+
+    <!-- ── ROW 2: Avance del mes + Accesorios ── -->
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:16px;">
+      <!-- AVANCE DEL MES -->
+      <div class="avance-card">
+        <div class="avance-header">
+          <span class="avance-title">📅 Avance del Mes en Curso</span>
+          <span class="avance-val" id="av-pct">—%</span>
+        </div>
+        <div class="avance-meta" id="av-meta">—</div>
+        <div class="progress-track"><div class="progress-fill" id="av-bar" style="width:0%"></div></div>
+        <div class="progress-labels">
+          <span class="progress-lbl" id="av-lbl-left">Día 1</span>
+          <span class="progress-lbl" id="av-lbl-right">—</span>
+        </div>
+      </div>
+      <!-- ACCESORIOS -->
+      <div class="kcard c3">
+        <div class="kt"><span class="klbl">Facturación Accesorios</span><span class="kico">🔧</span></div>
+        <div class="kval" id="k-acc">—</div>
+        <div class="ksub" id="k-acc-sub">Accesorios + Material POP</div>
+      </div>
+    </div>
+
+    <!-- ── ROW 3: Tabla Ventas por Vendedor + Litros por Tipo de Cliente ── -->
+    <div class="row31">
+      <div class="ccard">
+        <div class="ch">
+          <div><div class="ctitle">Ventas Cerradas por Vendedor</div><div class="csub">Litros · Pesos · Clientes</div></div>
+          <span class="ctag">Tabla</span>
+        </div>
+        <table class="vtable">
+          <thead><tr>
+            <th>Vendedor</th>
+            <th class="num">Ventas $</th>
+            <th class="num">Litros</th>
+            <th class="num">Clientes</th>
+          </tr></thead>
+          <tbody id="tbl-vend-body"></tbody>
+        </table>
+      </div>
+      <div class="ccard">
+        <div class="ch">
+          <div><div class="ctitle">Litros por Tipo de Cliente</div><div class="csub">Volumen · Promedio por tipo</div></div>
+          <span class="ctag">Horizontal</span>
+        </div>
+        <div class="cwrap"><canvas id="chart-tipo"></canvas></div>
+        <table class="dtable" style="margin-top:14px;">
+          <thead><tr>
+            <th>Tipo</th>
+            <th class="num">Total Litros</th>
+            <th class="num">Prom. x Cliente</th>
+          </tr></thead>
+          <tbody id="tbl-tipo-prom"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── ROW 4: Ranking Vendedores litros + Descuento por Vendedor ── -->
+    <div class="row2">
+      <div class="ccard">
+        <div class="ch">
+          <div><div class="ctitle">Ranking Vendedores — Litros</div><div class="csub">Volumen en litros vendidos</div></div>
+          <span class="ctag">Ranking</span>
+        </div>
+        <div class="cwrap"><canvas id="chart-vendedor"></canvas></div>
+      </div>
+      <div class="ccard">
+        <div class="ch">
+          <div><div class="ctitle">Descuento Promedio por Vendedor</div><div class="csub">% descuento otorgado</div></div>
+          <span class="ctag">Tabla</span>
+        </div>
+        <table class="dtable">
+          <thead><tr>
+            <th>Vendedor</th>
+            <th class="num">Dto. Prom.</th>
+            <th class="num">Litros</th>
+            <th class="num">Clientes</th>
+          </tr></thead>
+          <tbody id="tbl-dto-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── ROW 5: Ventas Familia top10 + Dona mix ── -->
+    <div class="row31">
+      <div class="ccard">
+        <div class="ch">
+          <div><div class="ctitle">Ventas por Familia — Top 10</div><div class="csub">$ · Litros</div></div>
+          <span class="ctag">Barras</span>
+        </div>
+        <div class="cwrap lg"><canvas id="chart-familia"></canvas></div>
+      </div>
+      <div class="ccard">
+        <div class="ch">
+          <div><div class="ctitle">Mix por Familia</div><div class="csub">Distribución ventas $</div></div>
+          <span class="ctag">Dona</span>
+        </div>
+        <div class="cwrap sm"><canvas id="chart-dona"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── ROW 6: Tendencia mensual (al fondo) ── -->
+    <div style="margin-bottom:0;">
+      <div class="ccard">
+        <div class="ch">
+          <div><div class="ctitle">Tendencia Mensual de Ventas</div><div class="csub">Ventas $ · Litros por mes</div></div>
+          <span class="ctag">Línea</span>
+        </div>
+        <div class="cwrap lg"><canvas id="chart-mensual"></canvas></div>
+      </div>
+    </div>
+
+  </div><!-- /dash -->
+</main>
+
+<script>
+Chart.defaults.color='#64748b';
+Chart.defaults.borderColor='#1f2d45';
+Chart.defaults.font.family="'DM Mono',monospace";
+Chart.defaults.font.size=11;
+Chart.defaults.plugins.tooltip.backgroundColor='#1a2235';
+Chart.defaults.plugins.tooltip.borderColor='#1f2d45';
+Chart.defaults.plugins.tooltip.borderWidth=1;
+Chart.defaults.plugins.tooltip.padding=12;
+Chart.defaults.plugins.tooltip.titleColor='#e2e8f0';
+Chart.defaults.plugins.tooltip.bodyColor='#94a3b8';
+
+const PAL=['#00d4ff','#ff6b35','#7c3aed','#10b981','#f59e0b','#e879f9','#fb7185','#34d399','#60a5fa','#a78bfa','#fbbf24','#4ade80'];
+const MES_ORD=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+const DIAS_X_MES={ENERO:31,FEBRERO:28,MARZO:31,ABRIL:30,MAYO:31,JUNIO:30,JULIO:31,AGOSTO:31,SEPTIEMBRE:30,OCTUBRE:31,NOVIEMBRE:30,DICIEMBRE:31};
+
+// Ejercicio 2025-2026: sep-dic → 2025, ene-ago → 2026
+// Se puede ampliar si el ejercicio cambia
+const MES_ANIO={
+  ENERO:'2026',FEBRERO:'2026',MARZO:'2026',ABRIL:'2026',MAYO:'2026',JUNIO:'2026',
+  JULIO:'2026',AGOSTO:'2026',SEPTIEMBRE:'2025',OCTUBRE:'2025',NOVIEMBRE:'2025',DICIEMBRE:'2025'
+};
+// Orden cronológico del ejercicio: sep 2025 → ago 2026
+const MES_ORD_EJERCICIO=[
+  'SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE',
+  'ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO'
+];
+const mesCap=m=>m.charAt(0)+m.slice(1).toLowerCase();
+const mesLabel=m=>`${mesCap(m)} ${MES_ANIO[m]||''}`;
+
+// Orden fijo de vendedores (nombre en datos → etiqueta a mostrar)
+const VEND_ORDER=[
+  {data:'ALEJANDRO LO PRESTI',  label:'Alejandro Lo Presti V'},
+  {data:'ALEJANDRO LO PRESTI S',label:'Alejandro Lo Presti S'},
+  {data:'JAVIER SAUCEDO',       label:'Javier Saucedo'},
+  {data:'PABLO TORRES',         label:'Pablo Torres'},
+  {data:'CARLOS DEMARTINI',     label:'Carlos Demartini'},
+  {data:'ARIEL GOMEZ V',        label:'Ariel Gomez V'},
+  {data:'ARIEL GOMEZ S',        label:'Ariel Gomez S'},
+];
+
+let rawData=[];
+let charts={};
+
+/* ── FILE HANDLER ── */
+function handleFile(input){
+  const file=input.files[0]; if(!file)return;
+  document.getElementById('file-lbl').textContent=file.name;
+  document.getElementById('loading').style.display='flex';
+  const reader=new FileReader();
+  reader.onload=(e)=>{
+    try{
+      let wb;
+      if(file.name.endsWith('.csv')) wb=XLSX.read(e.target.result,{type:'binary'});
+      else wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const sheet=wb.SheetNames.includes('BASE')?'BASE':wb.SheetNames[0];
+      rawData=XLSX.utils.sheet_to_json(wb.Sheets[sheet],{defval:''});
+      document.getElementById('loading').style.display='none';
+      populateFilters(rawData);
+      renderAll(rawData);
+      document.getElementById('pulse').classList.add('on');
+      document.getElementById('hdr-status').textContent=`${file.name} · ${rawData.length.toLocaleString('es-AR')} filas`;
+      document.getElementById('hdr-time').textContent=new Date().toLocaleTimeString('es-AR');
+    }catch(err){
+      document.getElementById('loading').style.display='none';
+      alert('Error al leer el archivo: '+err.message);
+    }
+  };
+  file.name.endsWith('.csv')?reader.readAsBinaryString(file):reader.readAsArrayBuffer(file);
+}
+
+/* ── FILTERS ── */
+function populateFilters(rows){
+  // Meses: orden cronológico del ejercicio, con año en la etiqueta
+  const mesesPresentes=new Set(rows.map(r=>r.MES).filter(v=>v&&v!==''));
+  const elMes=document.getElementById('f-mes'), curMes=elMes.value;
+  elMes.innerHTML=elMes.options[0].outerHTML;
+  MES_ORD_EJERCICIO.filter(m=>mesesPresentes.has(m)).forEach(m=>{
+    const o=document.createElement('option');
+    o.value=m; o.textContent=mesLabel(m); elMes.appendChild(o);
+  });
+  if(curMes)elMes.value=curMes;
+
+  // Resto de filtros: orden alfabético normal
+  const fill=(id,vals)=>{
+    const el=document.getElementById(id),cur=el.value;
+    el.innerHTML=el.options[0].outerHTML;
+    [...new Set(vals.filter(v=>v&&v!==''))].sort().forEach(v=>{
+      const o=document.createElement('option');o.value=v;o.textContent=v;el.appendChild(o);
+    });
+    if(cur)el.value=cur;
+  };
+  fill('f-tipo',rows.map(r=>r.TIPO));
+  fill('f-vendedor',rows.map(r=>r.VENDEDOR).filter(v=>v!=='AURA'));
+  fill('f-segmento',rows.map(r=>r.SEGMENTO));
+  document.getElementById('filters').style.display='flex';
+}
+function getFiltered(){
+  const mes=document.getElementById('f-mes').value,tipo=document.getElementById('f-tipo').value,
+        vend=document.getElementById('f-vendedor').value,seg=document.getElementById('f-segmento').value;
+  return rawData.filter(r=>(!mes||r.MES===mes)&&(!tipo||r.TIPO===tipo)&&(!vend||r.VENDEDOR===vend)&&(!seg||r.SEGMENTO===seg));
+}
+function applyFilters(){renderAll(getFiltered());}
+function resetFilters(){
+  ['f-mes','f-tipo','f-vendedor','f-segmento'].forEach(id=>document.getElementById(id).value='');
+  renderAll(rawData);
+}
+
+/* ── HELPERS ── */
+const fmtARS=n=>'$'+Math.round(n).toLocaleString('es-AR');
+const fmtARSk=n=>{if(Math.abs(n)>=1e9)return'$'+(n/1e9).toFixed(2)+'B';if(Math.abs(n)>=1e6)return'$'+(n/1e6).toFixed(2)+'M';if(Math.abs(n)>=1e3)return'$'+(n/1e3).toFixed(0)+'K';return'$'+n.toFixed(0);};
+const fmtL=n=>Number(n).toLocaleString('es-AR',{maximumFractionDigits:0})+' L';
+const fmtLk=n=>{if(Math.abs(n)>=1e6)return(n/1e6).toFixed(2)+'M L';if(Math.abs(n)>=1e3)return(n/1e3).toFixed(1)+'K L';return n.toFixed(0)+' L';};
+const sum=(rows,col)=>rows.reduce((a,r)=>a+(parseFloat(r[col])||0),0);
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+
+/* ── AVANCE DEL MES ── */
+function renderAvance(rows){
+  // Detectar el mes más reciente en los datos
+  const mesesPresentes=MES_ORD.filter(m=>rows.some(r=>r.MES===m));
+  const mesActual=mesesPresentes[mesesPresentes.length-1]||'MAYO';
+  const diasTotales=DIAS_X_MES[mesActual]||30;
+
+  // Hoy: 31 de mayo 2026
+  const hoy=new Date(2026,4,31); // mes 4 = Mayo (0-indexed)
+  const mesHoyNombre=MES_ORD[hoy.getMonth()];
+  const diaHoy=hoy.getDate();
+
+  // Si el mes actual del reporte coincide con el mes real de hoy
+  let diaAvance, mesLabel, totalDias;
+  if(mesActual===mesHoyNombre){
+    diaAvance=diaHoy;
+    mesLabel=mesHoyNombre;
+    totalDias=diasTotales;
+  } else {
+    // Mes ya cerrado → 100%
+    diaAvance=diasTotales;
+    mesLabel=mesActual;
+    totalDias=diasTotales;
+  }
+  const pct=Math.min(100,Math.round(diaAvance/totalDias*100));
+  document.getElementById('av-pct').textContent=pct+'%';
+  document.getElementById('av-meta').textContent=`${mesLabel} · Día ${diaAvance} de ${totalDias}`;
+  document.getElementById('av-bar').style.width=pct+'%';
+  document.getElementById('av-lbl-left').textContent='Día '+diaAvance;
+  document.getElementById('av-lbl-right').textContent='Total: '+totalDias+' días';
+}
+
+/* ── MAIN RENDER ── */
+function renderAll(rows){
+  if(!rows.length)return;
+  document.getElementById('empty-state').style.display='none';
+  document.getElementById('dash').style.display='block';
+
+  const totalVentas=sum(rows,'TOTAL_NETO');
+  const totalLitros=sum(rows,'LITROS');
+  const clientes=new Set(rows.map(r=>r.CODIGO_CLIENTE).filter(Boolean));
+  const totalClientes=clientes.size;
+  // Precio neto x litro = Facturación / Litros
+  const precioXLitro=totalLitros>0?totalVentas/totalLitros:0;
+  // Dto promedio
+  const dtoRows=rows.filter(r=>{const d=parseFloat(r['DTO CLIENTE']);return d>0&&d<1;});
+  const avgDto=dtoRows.length>0?dtoRows.reduce((a,r)=>a+(parseFloat(r['DTO CLIENTE'])||0),0)/dtoRows.length:0;
+  const accRows=rows.filter(r=>{const f=String(r.FAMILIA||'').toLowerCase();return f==='accesorios'||f==='material pop';});
+  const totalAcc=sum(accRows,'TOTAL_NETO');
+
+  document.getElementById('k-ventas').textContent=fmtARSk(totalVentas);
+  document.getElementById('k-ventas-sub').textContent=`${totalClientes} clientes activos`;
+  document.getElementById('k-litros').textContent=fmtL(totalLitros);
+  document.getElementById('k-litros-sub').textContent='Litros netos vendidos';
+  document.getElementById('k-clientes').textContent=totalClientes.toLocaleString('es-AR');
+  document.getElementById('k-clientes-sub').textContent='Clientes únicos activos';
+  document.getElementById('k-ticket').textContent=fmtARS(precioXLitro);
+  document.getElementById('k-dto').textContent=(avgDto*100).toFixed(1)+'%';
+  document.getElementById('k-dto-sub').textContent='Descuento promedio otorgado';
+  document.getElementById('k-acc').textContent=fmtARSk(totalAcc);
+  document.getElementById('k-acc-sub').textContent='Accesorios + Material POP';
+
+  renderAvance(rows);
+  renderVendTable(rows);
+  renderTipoChart(rows);
+  renderVendedorChart(rows);
+  renderDtoTable(rows);
+  renderFamiliaChart(rows);
+  renderDona(rows);
+  renderMensual(rows);
+}
+
+/* ── TABLA VENDEDORES ── */
+function renderVendTable(rows){
+  const EXCL_VEND=['AURA','GERENCIA','VENDEDOR'];
+  const agg={};
+  rows.forEach(r=>{
+    const v=r.VENDEDOR||'';if(!v||EXCL_VEND.includes(v))return;
+    if(!agg[v])agg[v]={ventas:0,litros:0,clientes:new Set()};
+    agg[v].ventas+=(parseFloat(r.TOTAL_NETO)||0);
+    agg[v].litros+=(parseFloat(r.LITROS)||0);
+    agg[v].clientes.add(r.CODIGO_CLIENTE);
+  });
+  // Orden fijo primero, luego el resto
+  const ordered=[];
+  VEND_ORDER.forEach(({data,label})=>{if(agg[data])ordered.push({label,d:agg[data]});});
+  // Resto no en la lista
+  Object.entries(agg).forEach(([k,d])=>{
+    if(!VEND_ORDER.find(v=>v.data===k))ordered.push({label:k,d});
+  });
+  const maxV=ordered.reduce((m,{d})=>Math.max(m,d.ventas),0);
+  const totalV=ordered.reduce((s,{d})=>s+d.ventas,0);
+  const totalL=ordered.reduce((s,{d})=>s+d.litros,0);
+  const totalC=new Set(rows.map(r=>r.CODIGO_CLIENTE).filter(Boolean)).size;
+  const tbody=document.getElementById('tbl-vend-body');
+  tbody.innerHTML='';
+  ordered.forEach(({label,d})=>{
+    const pct=maxV>0?d.ventas/maxV*100:0;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="bar-cell"><div class="bar-bg" style="width:${pct.toFixed(1)}%"></div><span class="bar-txt">${label}</span></td>
+      <td class="num">${fmtARSk(d.ventas)}</td>
+      <td class="num">${fmtL(d.litros)}</td>
+      <td class="num">${d.clientes.size}</td>`;
+    tbody.appendChild(tr);
+  });
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><strong>Total</strong></td><td class="num"><strong>${fmtARSk(totalV)}</strong></td><td class="num"><strong>${fmtL(totalL)}</strong></td><td class="num"><strong>${totalC}</strong></td>`;
+  tbody.appendChild(tr);
+}
+
+/* ── CHART: Litros por Tipo de cliente ── */
+function renderTipoChart(rows){
+  destroyChart('tipo');
+  const EXCL_TIPO=['GERENCIA','AURA'];
+  const agg={};
+  const aggClientes={};
+  rows.forEach(r=>{
+    if(EXCL_TIPO.includes(r.TIPO))return;
+    const t=r.TIPO||'Otros';
+    if(!agg[t])agg[t]={litros:0,clientes:new Set()};
+    agg[t].litros+=(parseFloat(r.LITROS)||0);
+    agg[t].clientes.add(r.CODIGO_CLIENTE);
+  });
+  const sorted=Object.entries(agg).sort((a,b)=>b[1].litros-a[1].litros);
+  const ctx=document.getElementById('chart-tipo').getContext('2d');
+  charts['tipo']=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:sorted.map(([k])=>k),
+      datasets:[{label:'Litros',data:sorted.map(([,v])=>v.litros),
+        backgroundColor:PAL.slice(0,sorted.length).map(c=>c+'cc'),
+        borderColor:PAL.slice(0,sorted.length),borderWidth:1,borderRadius:4,borderSkipped:false}]
+    },
+    options:{
+      indexAxis:'y',responsive:true,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${fmtL(ctx.raw)}`}}},
+      scales:{x:{grid:{color:'#1f2d45'},ticks:{callback:v=>fmtLk(v)}},y:{grid:{display:false}}}
+    }
+  });
+  // Tabla promedio x tipo
+  const tbody=document.getElementById('tbl-tipo-prom');
+  tbody.innerHTML='';
+  sorted.forEach(([tipo,d],i)=>{
+    const prom=d.clientes.size>0?d.litros/d.clientes.size:0;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${PAL[i%PAL.length]};margin-right:6px;"></span>${tipo}</td>
+      <td class="num">${fmtL(d.litros)}</td>
+      <td class="num">${fmtL(prom)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ── CHART: Ranking Vendedores Litros — orden fijo ── */
+function renderVendedorChart(rows){
+  destroyChart('vendedor');
+  const agg={};
+  rows.forEach(r=>{const v=r.VENDEDOR||'';if(!v)return;agg[v]=(agg[v]||0)+(parseFloat(r.LITROS)||0);});
+  // Build en orden fijo
+  const data=VEND_ORDER.map(({data,label})=>({label,val:agg[data]||0}));
+  const ctx=document.getElementById('chart-vendedor').getContext('2d');
+  charts['vendedor']=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:data.map(d=>d.label),
+      datasets:[{label:'Litros',data:data.map(d=>d.val),
+        backgroundColor:data.map((_,i)=>PAL[i%PAL.length]+'bb'),
+        borderColor:data.map((_,i)=>PAL[i%PAL.length]),borderWidth:1,borderRadius:4}]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${fmtL(ctx.raw)}`}}},
+      scales:{
+        x:{grid:{color:'#1f2d45'},ticks:{maxRotation:30,font:{size:10}}},
+        y:{grid:{color:'#1f2d45'},ticks:{callback:v=>fmtLk(v)}}
+      }
+    }
+  });
+}
+
+/* ── TABLA Descuento por Vendedor — orden fijo ── */
+function renderDtoTable(rows){
+  const agg={};
+  rows.forEach(r=>{
+    const v=r.VENDEDOR||'';if(!v)return;
+    const dto=parseFloat(r['DTO CLIENTE'])||0;if(dto<=0||dto>=1)return;
+    if(!agg[v])agg[v]={dtos:[],litros:0,clientes:new Set()};
+    agg[v].dtos.push(dto);
+    agg[v].litros+=(parseFloat(r.LITROS)||0);
+    agg[v].clientes.add(r.CODIGO_CLIENTE);
+  });
+  // Orden fijo
+  const ordered=[];
+  VEND_ORDER.forEach(({data,label})=>{if(agg[data])ordered.push({label,d:agg[data]});});
+  const tbody=document.getElementById('tbl-dto-body');
+  tbody.innerHTML='';
+  ordered.forEach(({label,d})=>{
+    const avgDto=d.dtos.reduce((a,b)=>a+b,0)/d.dtos.length;
+    const pctNum=(avgDto*100);
+    const cls=pctNum>22?'pct-hi':pctNum>17?'pct-mid':'pct-lo';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${label}</td>
+      <td class="num"><span class="pct-pill ${cls}">${pctNum.toFixed(1)}%</span></td>
+      <td class="num">${fmtL(d.litros)}</td>
+      <td class="num">${d.clientes.size}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ── CHART: Familias Top 10 ── */
+function renderFamiliaChart(rows){
+  destroyChart('familia');
+  const agg={};
+  rows.forEach(r=>{const f=r.FAMILIA||'Otros';if(!agg[f])agg[f]={v:0,l:0};
+    agg[f].v+=(parseFloat(r.TOTAL_NETO)||0);agg[f].l+=(parseFloat(r.LITROS)||0);});
+  const sorted=Object.entries(agg).sort((a,b)=>b[1].v-a[1].v).slice(0,10);
+  const ctx=document.getElementById('chart-familia').getContext('2d');
+  charts['familia']=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:sorted.map(([k])=>k),
+      datasets:[
+        {label:'Ventas $',yAxisID:'y1',data:sorted.map(([,v])=>v.v),
+          backgroundColor:'rgba(0,212,255,.75)',borderColor:'#00d4ff',borderWidth:1,borderRadius:4},
+        {label:'Litros',yAxisID:'y2',type:'line',data:sorted.map(([,v])=>v.l),
+          borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.1)',fill:false,
+          tension:.4,pointRadius:5,pointHoverRadius:8,pointBackgroundColor:'#f59e0b',borderWidth:2}
+      ]
+    },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{position:'top',labels:{boxWidth:12,padding:16}},
+        tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>
+          ctx.datasetIndex===0?` ${ctx.dataset.label}: ${fmtARSk(ctx.raw)}`:` ${ctx.dataset.label}: ${fmtL(ctx.raw)}`}}
+      },
+      scales:{
+        x:{grid:{color:'#1f2d45'},ticks:{maxRotation:20,font:{size:10}}},
+        y1:{position:'left',grid:{color:'#1f2d45'},ticks:{callback:v=>fmtARSk(v)}},
+        y2:{position:'right',grid:{display:false},ticks:{callback:v=>fmtLk(v)}}
+      }
+    }
+  });
+}
+
+/* ── CHART: Dona familias ── */
+function renderDona(rows){
+  destroyChart('dona');
+  const agg={};
+  rows.forEach(r=>{const f=r.FAMILIA||'Otros';agg[f]=(agg[f]||0)+(parseFloat(r.TOTAL_NETO)||0);});
+  const sorted=Object.entries(agg).sort((a,b)=>b[1]-a[1]).slice(0,9);
+  const rest=Object.entries(agg).sort((a,b)=>b[1]-a[1]).slice(9).reduce((s,[,v])=>s+v,0);
+  if(rest>0)sorted.push(['Otros',rest]);
+  const total=sorted.reduce((s,[,v])=>s+v,0);
+  const ctx=document.getElementById('chart-dona').getContext('2d');
+  charts['dona']=new Chart(ctx,{
+    type:'doughnut',
+    data:{
+      labels:sorted.map(([k])=>k),
+      datasets:[{data:sorted.map(([,v])=>v),backgroundColor:PAL,borderColor:'#111827',borderWidth:2,hoverOffset:8}]
+    },
+    options:{
+      responsive:true,cutout:'62%',
+      plugins:{
+        legend:{position:'right',labels:{boxWidth:9,padding:10,font:{size:9}}},
+        tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${fmtARSk(ctx.raw)} (${(ctx.raw/total*100).toFixed(1)}%)`}}
+      }
+    }
+  });
+}
+
+/* ── CHART: Tendencia mensual ── */
+function renderMensual(rows){
+  destroyChart('mensual');
+  const agg={};
+  rows.forEach(r=>{const m=r.MES||'?';if(!agg[m])agg[m]={v:0,l:0};
+    agg[m].v+=(parseFloat(r.TOTAL_NETO)||0);agg[m].l+=(parseFloat(r.LITROS)||0);});
+  const labels=MES_ORD_EJERCICIO.filter(m=>agg[m]);
+  const ctx=document.getElementById('chart-mensual').getContext('2d');
+  charts['mensual']=new Chart(ctx,{
+    type:'line',
+    data:{
+      labels:labels.map(m=>mesLabel(m)),
+      datasets:[
+        {label:'Ventas $',yAxisID:'y1',data:labels.map(m=>agg[m].v),
+          borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.08)',fill:true,tension:.4,
+          pointRadius:4,pointHoverRadius:7,pointBackgroundColor:'#00d4ff'},
+        {label:'Litros',yAxisID:'y2',data:labels.map(m=>agg[m].l),
+          borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.06)',fill:true,tension:.4,
+          pointRadius:4,pointHoverRadius:7,pointBackgroundColor:'#f59e0b',borderDash:[5,3]}
+      ]
+    },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{position:'top',labels:{boxWidth:12,padding:16}},
+        tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>
+          ctx.datasetIndex===0?` ${ctx.dataset.label}: ${fmtARSk(ctx.raw)}`:` ${ctx.dataset.label}: ${fmtL(ctx.raw)}`}}
+      },
+      scales:{
+        x:{grid:{color:'#1f2d45'}},
+        y1:{position:'left',grid:{color:'#1f2d45'},ticks:{callback:v=>fmtARSk(v)}},
+        y2:{position:'right',grid:{display:false},ticks:{callback:v=>fmtLk(v)}}
+      },
+      interaction:{mode:'nearest',axis:'x',intersect:false}
+    }
+  });
+}
+</script>
+</body>
+</html>
