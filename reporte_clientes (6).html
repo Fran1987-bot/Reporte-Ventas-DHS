@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recupero de Clientes — DHS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0e1a;--surface:#111827;--surface2:#1a2235;--border:#1f2d45;
+  --c1:#00d4ff;--c2:#ef4444;--c3:#7c3aed;--c4:#10b981;--c5:#f59e0b;
+  --text:#e2e8f0;--muted:#64748b;--dim:#94a3b8;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{font-size:15px;}
+body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;}
+
+/* HEADER */
+.header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;
+  border-bottom:1px solid var(--border);background:rgba(17,24,39,.95);
+  position:sticky;top:0;z-index:100;}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--c2),var(--c3));
+  border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;}
+.logo-name{font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;letter-spacing:-.5px;}
+.logo-sub{font-size:.56rem;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--muted);}
+.pulse.on{background:var(--c4);box-shadow:0 0 8px var(--c4);animation:blink 2s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.4;}}
+.hdr-info{font-size:.62rem;color:var(--muted);}
+.hdr-time{font-size:.62rem;color:var(--c1);}
+
+/* UPLOAD */
+.upload-bar{padding:9px 28px;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.upload-btn{padding:5px 13px;border:1px solid var(--c1);border-radius:5px;background:rgba(0,212,255,.07);
+  color:var(--c1);font-family:'DM Mono',monospace;font-size:.7rem;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.upload-btn:hover{background:rgba(0,212,255,.18);}
+.upload-btn.sec{border-color:var(--muted);color:var(--muted);font-size:.66rem;}
+.upload-btn.sec:hover{border-color:var(--dim);color:var(--dim);}
+#file-input{display:none;}
+.src-lbl{font-size:.68rem;color:var(--c4);}
+.spin{width:13px;height:13px;border:2px solid var(--border);border-top-color:var(--c1);
+  border-radius:50%;animation:spin .8s linear infinite;display:none;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* FILTERS */
+.filters{padding:11px 28px;background:rgba(17,24,39,.6);border-bottom:1px solid var(--border);
+  display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+select.f,input.f{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  font-family:'DM Mono',monospace;font-size:.72rem;padding:6px 10px;border-radius:5px;
+  outline:none;cursor:pointer;transition:border-color .2s;}
+select.f:focus,input.f:focus{border-color:var(--c1);}
+input.f{min-width:180px;}
+.f-div{width:1px;height:18px;background:var(--border);}
+.btn-clear{padding:5px 11px;border:1px solid var(--border);border-radius:5px;background:transparent;
+  color:var(--muted);font-family:'DM Mono',monospace;font-size:.66rem;cursor:pointer;}
+.btn-clear:hover{border-color:var(--c2);color:var(--c2);}
+.btn-excel{padding:5px 13px;border:1px solid var(--c4);border-radius:5px;
+  background:rgba(16,185,129,.08);color:var(--c4);font-family:'DM Mono',monospace;
+  font-size:.68rem;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.btn-excel:hover{background:rgba(16,185,129,.2);}
+
+/* MAIN */
+.main{padding:18px 28px 60px;}
+
+/* KPI STRIP */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+@media(max-width:800px){.kpis{grid-template-columns:1fr 1fr;}}
+.kp{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:12px 16px;position:relative;overflow:hidden;}
+.kp::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.kp.c1::before{background:var(--c1)}.kp.c2::before{background:var(--c2)}
+.kp.c4::before{background:var(--c4)}.kp.c5::before{background:var(--c5)}
+.kp-lbl{font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.kp-val{font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem;line-height:1;}
+.kp.c1 .kp-val{color:var(--c1)}.kp.c2 .kp-val{color:var(--c2)}
+.kp.c4 .kp-val{color:var(--c4)}.kp.c5 .kp-val{color:var(--c5)}
+.kp-sub{font-size:.56rem;color:var(--muted);margin-top:4px;}
+
+/* TABLE */
+.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.tbl-head{display:flex;align-items:center;justify-content:space-between;
+  padding:12px 18px;border-bottom:1px solid var(--border);}
+.tbl-title{font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem;}
+.tbl-count{font-size:.65rem;color:var(--muted);}
+.tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+table{width:100%;border-collapse:collapse;font-size:.7rem;}
+thead th{background:var(--surface2);color:var(--muted);font-size:.54rem;letter-spacing:1.2px;
+  text-transform:uppercase;padding:8px 12px;text-align:left;white-space:nowrap;
+  border-bottom:1px solid var(--border);position:relative;user-select:none;}
+thead th.sortable{cursor:pointer;}
+thead th.sortable:hover{color:var(--c1);}
+thead th .sort-ico{margin-left:4px;opacity:.4;font-size:.6rem;}
+thead th.asc .sort-ico::after{content:'▲'}
+thead th.desc .sort-ico::after{content:'▼'}
+thead th:not(.asc):not(.desc) .sort-ico::after{content:'⇅'}
+tbody td{padding:8px 12px;border-bottom:1px solid rgba(31,45,69,.4);white-space:nowrap;vertical-align:middle;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:rgba(255,255,255,.025);}
+.num{text-align:right;font-variant-numeric:tabular-nums;}
+.pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:8px;font-size:.58rem;font-weight:600;}
+.pill-red{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.2);}
+.pill-grn{background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.2);}
+.pill-yel{background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.2);}
+.pill-blu{background:rgba(0,212,255,.12);color:#00d4ff;border:1px solid rgba(0,212,255,.2);}
+.pill-pur{background:rgba(124,58,237,.12);color:#a78bfa;border:1px solid rgba(124,58,237,.2);}
+.bar-mini{display:inline-block;height:6px;border-radius:3px;vertical-align:middle;margin-left:6px;min-width:4px;}
+.empty-row{text-align:center;padding:40px;color:var(--muted);font-size:.75rem;}
+.empty-row-ico{font-size:2rem;display:block;margin-bottom:8px;opacity:.3;}
+
+/* EMPTY STATE */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:55vh;gap:12px;text-align:center;}
+.empty-ico{font-size:3rem;opacity:.25;}
+.empty-t{font-family:'Syne',sans-serif;font-weight:700;font-size:1.1rem;color:var(--dim);}
+.empty-s{font-size:.7rem;color:var(--muted);max-width:300px;line-height:1.7;}
+.btn-cta{padding:9px 22px;background:linear-gradient(135deg,var(--c1),var(--c3));
+  border:none;border-radius:7px;color:#fff;font-family:'DM Mono',monospace;font-size:.78rem;cursor:pointer;}
+
+@media(max-width:600px){
+  .main{padding:12px 12px 60px;}
+  .filters,.upload-bar{padding:9px 12px;}
+  .header{padding:11px 14px;}
+  .logo-sub{display:none;}
+  .kp-val{font-size:1.25rem;}
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-mark">🎯</div>
+    <div>
+      <div class="logo-name">RECUPERO DE CLIENTES — DHS</div>
+      <div class="logo-sub">DHS · Distribuidora Oficial ALBA</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div class="pulse" id="pulse"></div>
+    <div>
+      <div class="hdr-info" id="hdr-info">Sin datos</div>
+      <div class="hdr-time" id="hdr-time"></div>
+    </div>
+  </div>
+</header>
+
+<!-- UPLOAD -->
+<div class="upload-bar">
+  <div class="spin" id="spin"></div>
+  <span class="src-lbl" id="src-lbl">Conectando a Google Sheets…</span>
+  <button class="upload-btn" onclick="loadSheets()">↻ Actualizar</button>
+  <button class="upload-btn sec" onclick="document.getElementById('file-input').click()">⬆ Excel manual</button>
+  <input type="file" id="file-input" accept=".xlsx,.xls,.csv" onchange="handleFile(this)">
+</div>
+
+<!-- FILTERS -->
+<div class="filters" id="filters" style="display:none;">
+  <select class="f" id="f-vendedor" onchange="render()">
+    <option value="">Todos los vendedores</option>
+    <option value="ALEJANDRO LO PRESTI">Alejandro Lo Presti V</option>
+    <option value="ALEJANDRO LO PRESTI S">Alejandro Lo Presti S</option>
+    <option value="JAVIER SAUCEDO">Javier Saucedo</option>
+    <option value="PABLO TORRES">Pablo Torres (+ Langford + Romero)</option>
+    <option value="CARLOS DEMARTINI">Carlos Demartini</option>
+    <option value="ARIEL GOMEZ">Ariel Gomez (+ Julio Garcia)</option>
+  </select>
+  <select class="f" id="f-tipo" onchange="render()">
+    <option value="">Todos los tipos</option>
+    <option value="PINTURERIA">Pinturería</option>
+    <option value="FERRETERIA">Ferretería</option>
+    <option value="CORRALON">Corralón</option>
+    <option value="MADERERA">Maderera</option>
+    <option value="SANITARIOS">Sanitarios</option>
+    <option value="OTROS">Otros</option>
+  </select>
+  <select class="f" id="f-estado" onchange="render()">
+    <option value="">Todos</option>
+    <option value="recapturar">🔴 A Recapturar (sin compra 2+ meses)</option>
+    <option value="activo" id="opt-activo">🟢 Activos</option>
+  </select>
+  <select class="f" id="f-mes" onchange="render()">
+    <option value="">Último mes: todos</option>
+  </select>
+  <input class="f" type="text" id="f-buscar" placeholder="🔍 Buscar cliente…" oninput="render()">
+  <div class="f-div"></div>
+  <button class="btn-clear" onclick="clearFilters()">✕ Limpiar</button>
+  <button class="btn-excel" onclick="downloadExcel()">⬇ Descargar Excel</button>
+</div>
+
+<main class="main">
+  <!-- EMPTY -->
+  <div class="empty" id="empty">
+    <div class="empty-ico">📋</div>
+    <div class="empty-t">Cargando datos…</div>
+    <div class="empty-s">Los datos se cargan automáticamente desde Google Sheets.</div>
+    <button class="btn-cta" onclick="document.getElementById('file-input').click()">⬆ Cargar Excel manual</button>
+  </div>
+
+  <!-- DASH -->
+  <div id="dash" style="display:none;">
+    <!-- KPIs -->
+    <div class="kpis">
+      <div class="kp c1"><div class="kp-lbl">Clientes Totales</div><div class="kp-val" id="k-total">—</div><div class="kp-sub">DHS en el período</div></div>
+      <div class="kp c4"><div class="kp-lbl">🟢 Activos</div><div class="kp-val" id="k-activos">—</div><div class="kp-sub" id="k-activos-sub">Compraron en últimos 2 meses</div></div>
+      <div class="kp c2"><div class="kp-lbl">🔴 A Recapturar</div><div class="kp-val" id="k-recap">—</div><div class="kp-sub">Sin compra 2+ meses</div></div>
+      <div class="kp c5"><div class="kp-lbl">🔄 Con Recompra</div><div class="kp-val" id="k-recomp">—</div><div class="kp-sub">Compraron 2+ meses</div></div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="tbl-wrap">
+      <div class="tbl-head">
+        <span class="tbl-title">📋 Detalle de Clientes</span>
+        <span class="tbl-count" id="tbl-count"></span>
+      </div>
+      <div class="tbl-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" data-col="nombre" onclick="sortBy('nombre')">Cliente <span class="sort-ico"></span></th>
+              <th class="sortable" data-col="vendedor" onclick="sortBy('vendedor')">Vendedor <span class="sort-ico"></span></th>
+              <th class="sortable" data-col="tipo" onclick="sortBy('tipo')">Tipo <span class="sort-ico"></span></th>
+              <th class="sortable" data-col="estado" onclick="sortBy('estado')">Estado <span class="sort-ico"></span></th>
+              <th class="sortable" data-col="ultimoMes" onclick="sortBy('ultimoMes')">Último Mes <span class="sort-ico"></span></th>
+              <th class="sortable num" data-col="cantMeses" onclick="sortBy('cantMeses')">Meses Activo <span class="sort-ico"></span></th>
+              <th class="sortable num" data-col="litros" onclick="sortBy('litros')">Litros <span class="sort-ico"></span></th>
+              <th class="sortable num" data-col="ventas" onclick="sortBy('ventas')">Ventas $ <span class="sort-ico"></span></th>
+              <th>Familia Top</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const SHEETS_URL='https://docs.google.com/spreadsheets/d/1MILJMvo3AYyAlXN7skG__wJ_5UtheEdWLmfSaGT2CEI/pub?gid=0&single=true&output=tsv';
+const MES_ORD=['SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE','ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO'];
+const MES_ANIO={SEPTIEMBRE:'2025',OCTUBRE:'2025',NOVIEMBRE:'2025',DICIEMBRE:'2025',ENERO:'2026',FEBRERO:'2026',MARZO:'2026',ABRIL:'2026',MAYO:'2026',JUNIO:'2026',JULIO:'2026',AGOSTO:'2026'};
+
+// ULTIMOS_2 se calcula dinámicamente al procesar los datos
+let ULTIMOS_2=[];
+
+function calcularUltimos2(rows){
+  // Detectar los 2 meses más recientes en los datos
+  const mesesPresentes=MES_ORD.filter(m=>rows.some(r=>r.MES===m));
+  if(mesesPresentes.length===0) return [];
+  // Tomar los últimos 2 en orden cronológico
+  return mesesPresentes.slice(-2);
+}
+const VEND_DHS=['ALEJANDRO LO PRESTI','ALEJANDRO LO PRESTI S','JAVIER SAUCEDO',
+  'PABLO TORRES','DIEGO LANGFORD','DAVID ROMERO',
+  'CARLOS DEMARTINI',
+  'ARIEL GOMEZ V','ARIEL GOMEZ S','JULIO GARCIA V','JULIO GARCIA S'];
+
+// Grupos de vendedores: mapear cada nombre del Excel al nombre del grupo
+const VEND_GRUPO={
+  'ALEJANDRO LO PRESTI':'ALEJANDRO LO PRESTI',
+  'ALEJANDRO LO PRESTI S':'ALEJANDRO LO PRESTI S',
+  'JAVIER SAUCEDO':'JAVIER SAUCEDO',
+  'PABLO TORRES':'PABLO TORRES',
+  'DIEGO LANGFORD':'PABLO TORRES',
+  'DAVID ROMERO':'PABLO TORRES',
+  'CARLOS DEMARTINI':'CARLOS DEMARTINI',
+  'ARIEL GOMEZ V':'ARIEL GOMEZ',
+  'ARIEL GOMEZ S':'ARIEL GOMEZ',
+  'JULIO GARCIA V':'ARIEL GOMEZ',
+  'JULIO GARCIA S':'ARIEL GOMEZ',
+};
+
+// Grupos únicos para filtro y display
+const GRUPO_LABEL={
+  'ALEJANDRO LO PRESTI':'Alejandro Lo Presti V',
+  'ALEJANDRO LO PRESTI S':'Alejandro Lo Presti S',
+  'JAVIER SAUCEDO':'Javier Saucedo',
+  'PABLO TORRES':'Pablo Torres',
+  'CARLOS DEMARTINI':'Carlos Demartini',
+  'ARIEL GOMEZ':'Ariel Gomez',
+};
+const VEND_LABEL={'ALEJANDRO LO PRESTI':'Alejandro Lo Presti V','ALEJANDRO LO PRESTI S':'Alejandro Lo Presti S','JAVIER SAUCEDO':'Javier Saucedo','PABLO TORRES':'Pablo Torres','CARLOS DEMARTINI':'Carlos Demartini','ARIEL GOMEZ V':'Ariel Gomez V','ARIEL GOMEZ S':'Ariel Gomez S'};
+const mesLbl=m=>`${m.charAt(0)+m.slice(1).toLowerCase()} ${MES_ANIO[m]||''}`;
+const fmtL=n=>Number(n).toLocaleString('es-AR',{maximumFractionDigits:0});
+const fmtARS=n=>{if(Math.abs(n)>=1e6)return'$'+(n/1e6).toFixed(1)+'M';if(Math.abs(n)>=1e3)return'$'+(n/1e3).toFixed(0)+'K';return'$'+Math.round(n);};
+
+let allClientes=[];
+let sortCol='litros';let sortDir='desc';
+let filteredData=[];
+
+// ── LOADERS ──
+function parseCSV(text){
+  const lines=text.split('\n').filter(l=>l.trim());
+  const headers=lines[0].split('\t').map(h=>h.trim().replace(/^"|"$/g,''));
+  return lines.slice(1).map(line=>{
+    const vals=line.split('\t');
+    const row={};
+    headers.forEach((h,i)=>{row[h]=(vals[i]??'').replace(/^"|"$/g,'').trim();});
+    return row;
+  });
+}
+
+
+async function loadSheets(){
+  const spin=document.getElementById('spin'),lbl=document.getElementById('src-lbl');
+  spin.style.display='block';lbl.textContent='Conectando…';lbl.style.color='var(--muted)';
+  try{
+    const res=await fetch(SHEETS_URL+'&cb='+Date.now());
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const rows=parseCSV(await res.text());
+    spin.style.display='none';lbl.textContent=`Google Sheets · ${rows.length.toLocaleString('es-AR')} filas`;lbl.style.color='var(--c4)';
+    onData(rows,'Google Sheets');
+  }catch(e){
+    spin.style.display='none';lbl.textContent='Error — usá Excel manual';lbl.style.color='var(--c2)';
+  }
+}
+
+function handleFile(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      let wb;
+      if(file.name.endsWith('.csv'))wb=XLSX.read(e.target.result,{type:'binary'});
+      else wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const sheet=wb.SheetNames.includes('BASE')?'BASE':wb.SheetNames[0];
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[sheet],{defval:''});
+      document.getElementById('src-lbl').textContent=`${file.name} · ${rows.length.toLocaleString('es-AR')} filas`;
+      document.getElementById('src-lbl').style.color='var(--c5)';
+      onData(rows,file.name);
+    }catch(e){alert('Error: '+e.message);}
+  };
+  file.name.endsWith('.csv')?reader.readAsBinaryString(file):reader.readAsArrayBuffer(file);
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  if(location.protocol==='file:'){
+    document.getElementById('src-lbl').textContent='Modo local — usá ⬆ Excel manual';
+    document.getElementById('src-lbl').style.color='var(--c5)';
+    document.getElementById('empty').querySelector('.empty-t').textContent='Cargá tu archivo';
+  } else {
+    document.getElementById('spin').style.display='block';
+    loadSheets();
+  }
+});
+
+// ── PROCESS ──
+function onData(rawRows,src){
+  // Calcular dinámicamente los 2 meses más recientes
+  ULTIMOS_2=calcularUltimos2(rawRows);
+  console.log('Últimos 2 meses detectados:', ULTIMOS_2);
+
+  const df=rawRows.filter(r=>VEND_DHS.includes(r.VENDEDOR));
+  const map={};
+  df.forEach(r=>{
+    const id=r.CODIGO_CLIENTE;
+    // Mapear vendedor al grupo correspondiente
+    const grupo=VEND_GRUPO[r.VENDEDOR]||r.VENDEDOR;
+    if(!map[id])map[id]={id,nombre:r.RAZON_SOCIAL||'',tipo:r.TIPO||'',vendedor:grupo,
+      meses:new Set(),litros:0,ventas:0,fams:{}};
+    const c=map[id];
+    // Si el cliente ya estaba asignado a otro grupo, conservar el grupo del vendedor con más litros
+    // pero unificar la historia
+    if(r.MES)c.meses.add(r.MES);
+    c.litros+=(parseNum(r.LITROS)||0);
+    c.ventas+=(parseNum(r.TOTAL_NETO)||0);
+    if(r.FAMILIA)c.fams[r.FAMILIA]=(c.fams[r.FAMILIA]||0)+(parseNum(r.TOTAL_NETO)||0);
+  });
+  allClientes=Object.values(map).map(c=>{
+    const mesesArr=MES_ORD.filter(m=>c.meses.has(m));
+    const ultimoMes=mesesArr[mesesArr.length-1]||'';
+    const familiaTop=Object.entries(c.fams).sort((a,b)=>b[1]-a[1])[0]?.[0]||'—';
+    const activo=ULTIMOS_2.includes(ultimoMes);
+    return{...c,mesesArr,ultimoMes,cantMeses:mesesArr.length,familiaTop,
+      estado:activo?'activo':'recapturar'};
+  });
+
+  // Poblar filtro último mes
+  const mesesPresentes=[...new Set(allClientes.map(c=>c.ultimoMes))].filter(Boolean);
+  const selM=document.getElementById('f-mes');
+  selM.innerHTML='<option value="">Último mes: todos</option>';
+  MES_ORD.filter(m=>mesesPresentes.includes(m)).forEach(m=>{
+    const o=document.createElement('option');o.value=m;o.textContent='Último: '+mesLbl(m);selM.appendChild(o);
+  });
+
+  document.getElementById('pulse').classList.add('on');
+  document.getElementById('hdr-info').textContent=src;
+  document.getElementById('hdr-time').textContent=new Date().toLocaleTimeString('es-AR');
+  document.getElementById('filters').style.display='flex';
+  document.getElementById('empty').style.display='none';
+  document.getElementById('dash').style.display='block';
+  render();
+}
+
+// ── RENDER ──
+function render(){
+  const fVend=document.getElementById('f-vendedor').value;
+  const fTipo=document.getElementById('f-tipo').value;
+  const fEstado=document.getElementById('f-estado').value;
+  const fMes=document.getElementById('f-mes').value;
+  const fBuscar=document.getElementById('f-buscar').value.toLowerCase();
+
+  filteredData=allClientes.filter(c=>
+    (!fVend||c.vendedor===fVend)&&
+    (!fTipo||c.tipo===fTipo)&&
+    (!fEstado||c.estado===fEstado)&&
+    (!fMes||c.ultimoMes===fMes)&&
+    (!fBuscar||c.nombre.toLowerCase().includes(fBuscar))
+  );
+
+  // Ordenar
+  filteredData.sort((a,b)=>{
+    let va=a[sortCol],vb=b[sortCol];
+    if(sortCol==='ultimoMes'){va=MES_ORD.indexOf(a.ultimoMes);vb=MES_ORD.indexOf(b.ultimoMes);}
+    if(typeof va==='string')va=va.toLowerCase();
+    if(typeof vb==='string')vb=vb.toLowerCase();
+    return sortDir==='asc'?(va>vb?1:va<vb?-1:0):(va<vb?1:va>vb?-1:0);
+  });
+
+  // KPIs (sobre filtro actual)
+  const activos=filteredData.filter(c=>c.estado==='activo').length;
+  const recap=filteredData.filter(c=>c.estado==='recapturar').length;
+  const recomp=filteredData.filter(c=>c.cantMeses>=2).length;
+  document.getElementById('k-total').textContent=filteredData.length;
+  document.getElementById('k-activos').textContent=activos;
+  // Actualizar label dinámico del KPI y filtro
+  const activosLabel=ULTIMOS_2.map(m=>m.charAt(0)+m.slice(1).toLowerCase()).join('/');
+  const kActSub=document.getElementById('k-activos-sub');
+  if(kActSub)kActSub.textContent='Compraron '+activosLabel;
+  document.getElementById('k-recap').textContent=recap;
+  document.getElementById('k-recomp').textContent=recomp;
+  document.getElementById('tbl-count').textContent=filteredData.length+' clientes';
+
+  // Máx litros para barra
+  const maxL=Math.max(...filteredData.map(c=>c.litros),1);
+
+  const tbody=document.getElementById('tbody');
+  tbody.innerHTML='';
+  if(!filteredData.length){
+    tbody.innerHTML=`<tr><td colspan="9"><div class="empty-row"><span class="empty-row-ico">🔍</span>Sin clientes con estos filtros</div></td></tr>`;
+    return;
+  }
+  filteredData.forEach(c=>{
+    const esActivo=c.estado==='activo';
+    const estadoPill=esActivo?
+      `<span class="pill pill-grn">🟢 Activo</span>`:
+      `<span class="pill pill-red">🔴 Recapturar</span>`;
+    const mesPill=esActivo?
+      `<span class="pill pill-grn">${mesLbl(c.ultimoMes)}</span>`:
+      `<span class="pill pill-red">${mesLbl(c.ultimoMes)}</span>`;
+    const mesesPill=c.cantMeses>=3?
+      `<span class="pill pill-grn">${c.cantMeses}</span>`:
+      c.cantMeses===2?`<span class="pill pill-yel">${c.cantMeses}</span>`:
+      `<span class="pill pill-pur">${c.cantMeses}</span>`;
+    const barW=Math.round(c.litros/maxL*80);
+    const tipoPill=`<span class="pill pill-blu">${c.tipo}</span>`;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td title="${c.mesesArr.map(m=>mesLbl(m)).join(' · ')}">${c.nombre}</td>
+      <td>${GRUPO_LABEL[c.vendedor]||c.vendedor}</td>
+      <td>${tipoPill}</td>
+      <td>${estadoPill}</td>
+      <td>${mesPill}</td>
+      <td class="num">${mesesPill}</td>
+      <td class="num">${fmtL(c.litros)} L<span class="bar-mini" style="background:${esActivo?'var(--c4)':'var(--c2)'};width:${barW}px;"></span></td>
+      <td class="num">${fmtARS(c.ventas)}</td>
+      <td>${c.familiaTop}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  updateSortIcons();
+}
+
+// ── SORT ──
+function sortBy(col){
+  if(sortCol===col)sortDir=sortDir==='desc'?'asc':'desc';
+  else{sortCol=col;sortDir=col==='nombre'||col==='vendedor'||col==='tipo'?'asc':'desc';}
+  render();
+}
+function updateSortIcons(){
+  document.querySelectorAll('thead th').forEach(th=>{
+    th.classList.remove('asc','desc');
+    if(th.dataset.col===sortCol)th.classList.add(sortDir);
+  });
+}
+
+// ── CLEAR ──
+function clearFilters(){
+  ['f-vendedor','f-tipo','f-estado','f-mes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-buscar').value='';
+  render();
+}
+
+// ── DOWNLOAD EXCEL ──
+function downloadExcel(){
+  if(!filteredData.length){alert('No hay datos para descargar');return;}
+  const rows=filteredData.map(c=>({
+    'Cliente':c.nombre,
+    'Vendedor':GRUPO_LABEL[c.vendedor]||c.vendedor,
+    'Tipo':c.tipo,
+    'Estado':c.estado==='activo'?'Activo':'A Recapturar',
+    'Último Mes':mesLbl(c.ultimoMes),
+    'Meses Activo':c.cantMeses,
+    'Meses Comprados':c.mesesArr.map(m=>mesLbl(m)).join(', '),
+    'Litros':Math.round(c.litros),
+    'Ventas $':Math.round(c.ventas),
+    'Familia Top':c.familiaTop,
+  }));
+  const ws=XLSX.utils.json_to_sheet(rows);
+  // Anchos de columna
+  ws['!cols']=[{wch:35},{wch:22},{wch:13},{wch:14},{wch:16},{wch:13},{wch:45},{wch:12},{wch:14},{wch:18}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Clientes');
+  const fecha=new Date().toLocaleDateString('es-AR').replace(/\//g,'-');
+  XLSX.writeFile(wb,`DHS_Recupero_Clientes_${fecha}.xlsx`);
+}
+</script>
+</body>
+</html>
